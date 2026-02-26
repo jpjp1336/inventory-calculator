@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재고 평균 단가 계산기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.10); padding: 36px 32px; max-width: 520px; width: 100%; }
+  h1 { font-size: 1.4rem; color: #1a202c; margin-bottom: 6px; }
+  .subtitle { color: #718096; font-size: 0.88rem; margin-bottom: 28px; }
+  .section { background: #f7fafc; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #e2e8f0; }
+  .section-title { font-size: 0.8rem; font-weight: 600; color: #4a5568; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
+  .row { display: flex; gap: 12px; }
+  .field { flex: 1; }
+  label { display: block; font-size: 0.82rem; color: #4a5568; margin-bottom: 5px; font-weight: 500; }
+  input { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 1rem; color: #1a202c; transition: border 0.2s; background: white; }
+  input:focus { outline: none; border-color: #4299e1; }
+  .btn { width: 100%; padding: 14px; background: #4299e1; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.2s; }
+  .btn:hover { background: #2b6cb0; }
+  .result { background: linear-gradient(135deg, #ebf8ff, #e6fffa); border: 1.5px solid #bee3f8; border-radius: 12px; padding: 24px; margin-top: 20px; display: none; }
+  .result-title { font-size: 0.85rem; color: #2c7a7b; font-weight: 600; margin-bottom: 16px; }
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .result-item { background: white; border-radius: 8px; padding: 14px; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .result-item.highlight { grid-column: 1 / -1; background: #2b6cb0; color: white; }
+  .result-item.highlight .val { color: white; font-size: 1.5rem; }
+  .result-item.highlight .lbl { color: #bee3f8; }
+  .lbl { font-size: 0.75rem; color: #718096; margin-bottom: 4px; }
+  .val { font-size: 1.1rem; font-weight: 700; color: #2d3748; }
+  .formula { font-size: 0.78rem; color: #718096; margin-top: 14px; background: #f7fafc; border-radius: 8px; padding: 10px 14px; line-height: 1.6; }
+  .add-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+  .btn-add { background: none; border: 1.5px dashed #cbd5e0; color: #718096; padding: 7px 14px; border-radius: 8px; font-size: 0.82rem; cursor: pointer; transition: 0.2s; }
+  .btn-add:hover { border-color: #4299e1; color: #4299e1; }
+  .btn-remove { background: none; border: none; color: #cbd5e0; font-size: 1.1rem; cursor: pointer; padding: 0 4px; transition: 0.2s; align-self: flex-end; padding-bottom: 10px; }
+  .btn-remove:hover { color: #fc8181; }
+  .extra-section { background: #fffaf0; border: 1px solid #fbd38d; border-radius: 12px; padding: 20px; margin-bottom: 16px; position: relative; }
+  .extra-section .section-title { color: #c05621; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📦 재고 평균 단가 계산기</h1>
+  <p class="subtitle">기존 재고와 추가 매입분의 가중평균 원가를 계산합니다</p>
+
+  <div class="section">
+    <div class="section-title">📌 기존 보유 재고</div>
+    <div class="row">
+      <div class="field">
+        <label>수량</label>
+        <input type="number" id="qty1" placeholder="예: 100" min="0">
+      </div>
+      <div class="field">
+        <label>단가 (원)</label>
+        <input type="number" id="price1" placeholder="예: 5000" min="0">
+      </div>
+    </div>
+  </div>
+
+  <div id="extra-purchases"></div>
+
+  <div class="add-row">
+    <button class="btn-add" onclick="addPurchase()">＋ 추가 매입 행 추가</button>
+  </div>
+
+  <button class="btn" onclick="calculate()">평균 단가 계산하기</button>
+
+  <div class="result" id="result">
+    <div class="result-title">🧮 계산 결과</div>
+    <div class="result-grid" id="result-grid"></div>
+    <div class="formula" id="formula"></div>
+  </div>
+</div>
+
+<script>
+let purchaseCount = 0;
+
+function addPurchase() {
+  purchaseCount++;
+  const id = purchaseCount;
+  const container = document.getElementById('extra-purchases');
+  const div = document.createElement('div');
+  div.className = 'extra-section';
+  div.id = `purchase-${id}`;
+  div.innerHTML = `
+    <div class="section-title">🛒 추가 매입 ${id}</div>
+    <div class="row">
+      <div class="field">
+        <label>수량</label>
+        <input type="number" id="qty-${id}" placeholder="예: 50" min="0">
+      </div>
+      <div class="field">
+        <label>단가 (원)</label>
+        <input type="number" id="price-${id}" placeholder="예: 4200" min="0">
+      </div>
+      <button class="btn-remove" onclick="removePurchase(${id})" title="삭제">✕</button>
+    </div>
+  `;
+  container.appendChild(div);
+}
+
+function removePurchase(id) {
+  document.getElementById(`purchase-${id}`).remove();
+}
+
+function fmt(n) {
+  return Math.round(n).toLocaleString('ko-KR') + '원';
+}
+
+function calculate() {
+  const q1 = parseFloat(document.getElementById('qty1').value) || 0;
+  const p1 = parseFloat(document.getElementById('price1').value) || 0;
+
+  if (q1 <= 0 || p1 <= 0) {
+    alert('기존 재고의 수량과 단가를 입력해주세요.');
+    return;
+  }
+
+  let totalQty = q1;
+  let totalCost = q1 * p1;
+  let formulaParts = [`(${q1.toLocaleString()} × ${p1.toLocaleString()}원)`];
+  let purchases = [];
+
+  const extras = document.querySelectorAll('[id^="purchase-"]');
+  extras.forEach(el => {
+    const idNum = el.id.replace('purchase-', '');
+    const q = parseFloat(document.getElementById(`qty-${idNum}`).value) || 0;
+    const p = parseFloat(document.getElementById(`price-${idNum}`).value) || 0;
+    if (q > 0 && p > 0) {
+      totalQty += q;
+      totalCost += q * p;
+      formulaParts.push(`(${q.toLocaleString()} × ${p.toLocaleString()}원)`);
+      purchases.push({ q, p });
+    }
+  });
+
+  const avgPrice = totalCost / totalQty;
+
+  const grid = document.getElementById('result-grid');
+  let html = `
+    <div class="result-item highlight">
+      <div class="lbl">📊 가중평균 단가 (새 원가)</div>
+      <div class="val">${fmt(avgPrice)}</div>
+    </div>
+    <div class="result-item">
+      <div class="lbl">총 보유 수량</div>
+      <div class="val">${totalQty.toLocaleString()}개</div>
+    </div>
+    <div class="result-item">
+      <div class="lbl">총 재고 금액</div>
+      <div class="val">${fmt(totalCost)}</div>
+    </div>
+    <div class="result-item">
+      <div class="lbl">기존 단가</div>
+      <div class="val">${fmt(p1)}</div>
+    </div>
+    <div class="result-item">
+      <div class="lbl">단가 변화</div>
+      <div class="val" style="color:${avgPrice < p1 ? '#38a169' : '#e53e3e'}">${avgPrice < p1 ? '▼' : '▲'} ${fmt(Math.abs(avgPrice - p1))}</div>
+    </div>
+  `;
+  grid.innerHTML = html;
+
+  document.getElementById('formula').innerHTML =
+    `<b>계산식:</b><br>총원가 = ${formulaParts.join(' + ')}<br>= ${fmt(totalCost)}<br>평균단가 = ${fmt(totalCost)} ÷ ${totalQty.toLocaleString()}개 = <b>${fmt(avgPrice)}</b>`;
+
+  const resultEl = document.getElementById('result');
+  resultEl.style.display = 'block';
+  resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// 기본으로 추가 매입 1개 생성
+addPurchase();
+</script>
+</body>
+</html>
