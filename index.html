@@ -7,16 +7,18 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', sans-serif; background: #f0f4f8; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-  .card { background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.10); padding: 36px 32px; max-width: 520px; width: 100%; }
+  .card { background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.10); padding: 36px 32px; max-width: 560px; width: 100%; }
   h1 { font-size: 1.4rem; color: #1a202c; margin-bottom: 6px; }
   .subtitle { color: #718096; font-size: 0.88rem; margin-bottom: 28px; }
   .section { background: #f7fafc; border-radius: 12px; padding: 20px; margin-bottom: 16px; border: 1px solid #e2e8f0; }
   .section-title { font-size: 0.8rem; font-weight: 600; color: #4a5568; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 14px; }
-  .row { display: flex; gap: 12px; }
+  .row { display: flex; gap: 12px; align-items: flex-end; }
   .field { flex: 1; }
   label { display: block; font-size: 0.82rem; color: #4a5568; margin-bottom: 5px; font-weight: 500; }
   input { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 1rem; color: #1a202c; transition: border 0.2s; background: white; }
   input:focus { outline: none; border-color: #4299e1; }
+  input.auto-filled { background: #ebf8ff; border-color: #90cdf4; color: #2b6cb0; }
+  .or-divider { font-size: 0.72rem; color: #cbd5e0; text-align: center; padding: 10px 0 6px; letter-spacing: 0.05em; }
   .btn { width: 100%; padding: 14px; background: #4299e1; color: white; border: none; border-radius: 10px; font-size: 1rem; font-weight: 600; cursor: pointer; margin-top: 8px; transition: background 0.2s; }
   .btn:hover { background: #2b6cb0; }
   .result { background: linear-gradient(135deg, #ebf8ff, #e6fffa); border: 1.5px solid #bee3f8; border-radius: 12px; padding: 24px; margin-top: 20px; display: none; }
@@ -32,10 +34,12 @@
   .add-row { display: flex; justify-content: flex-end; margin-top: 10px; }
   .btn-add { background: none; border: 1.5px dashed #cbd5e0; color: #718096; padding: 7px 14px; border-radius: 8px; font-size: 0.82rem; cursor: pointer; transition: 0.2s; }
   .btn-add:hover { border-color: #4299e1; color: #4299e1; }
-  .btn-remove { background: none; border: none; color: #cbd5e0; font-size: 1.1rem; cursor: pointer; padding: 0 4px; transition: 0.2s; align-self: flex-end; padding-bottom: 10px; }
+  .btn-remove { background: none; border: none; color: #cbd5e0; font-size: 1.1rem; cursor: pointer; padding: 2px 4px; transition: 0.2s; }
   .btn-remove:hover { color: #fc8181; }
-  .extra-section { background: #fffaf0; border: 1px solid #fbd38d; border-radius: 12px; padding: 20px; margin-bottom: 16px; position: relative; }
+  .extra-section { background: #fffaf0; border: 1px solid #fbd38d; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
   .extra-section .section-title { color: #c05621; }
+  .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .hint { font-size: 0.71rem; color: #a0aec0; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -83,17 +87,33 @@ function addPurchase() {
   div.className = 'extra-section';
   div.id = `purchase-${id}`;
   div.innerHTML = `
-    <div class="section-title">🛒 추가 매입 ${id}</div>
+    <div class="section-header">
+      <div class="section-title" style="margin-bottom:0">🛒 추가 매입 ${id}</div>
+      <button class="btn-remove" onclick="removePurchase(${id})" title="삭제">✕</button>
+    </div>
+
     <div class="row">
       <div class="field">
         <label>수량</label>
-        <input type="number" id="qty-${id}" placeholder="예: 50" min="0">
+        <input type="number" id="qty-${id}" placeholder="예: 50" min="0"
+          oninput="onQtyChange(${id})">
       </div>
       <div class="field">
         <label>단가 (원)</label>
-        <input type="number" id="price-${id}" placeholder="예: 4200" min="0">
+        <input type="number" id="price-${id}" placeholder="예: 4,200" min="0"
+          oninput="onPriceChange(${id})">
       </div>
-      <button class="btn-remove" onclick="removePurchase(${id})" title="삭제">✕</button>
+    </div>
+
+    <div class="or-divider">── 또는 총 매입가로 입력 ──</div>
+
+    <div class="row">
+      <div class="field">
+        <label>총 매입가 (원)</label>
+        <input type="number" id="total-${id}" placeholder="예: 210,000" min="0"
+          oninput="onTotalChange(${id})">
+        <div class="hint">💡 총 매입가를 입력하면 단가가 자동으로 계산됩니다</div>
+      </div>
     </div>
   `;
   container.appendChild(div);
@@ -101,6 +121,58 @@ function addPurchase() {
 
 function removePurchase(id) {
   document.getElementById(`purchase-${id}`).remove();
+}
+
+// 총매입가 입력 → 단가 자동 계산
+function onTotalChange(id) {
+  const q = parseFloat(document.getElementById(`qty-${id}`).value);
+  const total = parseFloat(document.getElementById(`total-${id}`).value);
+  const priceEl = document.getElementById(`price-${id}`);
+
+  if (q > 0 && total > 0) {
+    priceEl.value = Math.round(total / q);
+    priceEl.classList.add('auto-filled');
+  } else {
+    priceEl.value = '';
+    priceEl.classList.remove('auto-filled');
+  }
+}
+
+// 단가 직접 입력 → 총매입가 자동 계산
+function onPriceChange(id) {
+  const q = parseFloat(document.getElementById(`qty-${id}`).value);
+  const p = parseFloat(document.getElementById(`price-${id}`).value);
+  const totalEl = document.getElementById(`total-${id}`);
+  const priceEl = document.getElementById(`price-${id}`);
+
+  priceEl.classList.remove('auto-filled');
+
+  if (q > 0 && p > 0) {
+    totalEl.value = Math.round(q * p);
+    totalEl.classList.add('auto-filled');
+  } else {
+    totalEl.value = '';
+    totalEl.classList.remove('auto-filled');
+  }
+}
+
+// 수량 변경 시 → 입력된 값 기준으로 반대쪽 재계산 (총매입가 우선)
+function onQtyChange(id) {
+  const q = parseFloat(document.getElementById(`qty-${id}`).value);
+  const total = parseFloat(document.getElementById(`total-${id}`).value);
+  const p = parseFloat(document.getElementById(`price-${id}`).value);
+  const priceEl = document.getElementById(`price-${id}`);
+  const totalEl = document.getElementById(`total-${id}`);
+
+  if (total > 0 && q > 0) {
+    // 총매입가가 있으면 단가 갱신
+    priceEl.value = Math.round(total / q);
+    priceEl.classList.add('auto-filled');
+  } else if (p > 0 && q > 0) {
+    // 단가가 있으면 총매입가 갱신
+    totalEl.value = Math.round(q * p);
+    totalEl.classList.add('auto-filled');
+  }
 }
 
 function fmt(n) {
@@ -119,7 +191,6 @@ function calculate() {
   let totalQty = q1;
   let totalCost = q1 * p1;
   let formulaParts = [`(${q1.toLocaleString()} × ${p1.toLocaleString()}원)`];
-  let purchases = [];
 
   const extras = document.querySelectorAll('[id^="purchase-"]');
   extras.forEach(el => {
@@ -130,14 +201,13 @@ function calculate() {
       totalQty += q;
       totalCost += q * p;
       formulaParts.push(`(${q.toLocaleString()} × ${p.toLocaleString()}원)`);
-      purchases.push({ q, p });
     }
   });
 
   const avgPrice = totalCost / totalQty;
 
   const grid = document.getElementById('result-grid');
-  let html = `
+  grid.innerHTML = `
     <div class="result-item highlight">
       <div class="lbl">📊 가중평균 단가 (새 원가)</div>
       <div class="val">${fmt(avgPrice)}</div>
@@ -159,7 +229,6 @@ function calculate() {
       <div class="val" style="color:${avgPrice < p1 ? '#38a169' : '#e53e3e'}">${avgPrice < p1 ? '▼' : '▲'} ${fmt(Math.abs(avgPrice - p1))}</div>
     </div>
   `;
-  grid.innerHTML = html;
 
   document.getElementById('formula').innerHTML =
     `<b>계산식:</b><br>총원가 = ${formulaParts.join(' + ')}<br>= ${fmt(totalCost)}<br>평균단가 = ${fmt(totalCost)} ÷ ${totalQty.toLocaleString()}개 = <b>${fmt(avgPrice)}</b>`;
